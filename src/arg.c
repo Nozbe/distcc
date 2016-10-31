@@ -212,8 +212,14 @@ int dcc_scan_args(char *argv[], char **input_file, char **output_file,
             } else if (!strcmp(a, "-frepo")) {
                 rs_log_info("compiler will emit .rpo files; must be local");
                 return EXIT_DISTCC_FAILED;
-            } else if (str_startswith("-x", a)) {
-                rs_log_info("gcc's -x handling is complex; running locally");
+            } else if (str_startswith("-x", a)
+                       && argv[i+1]
+                       && !str_startswith("c", argv[i+1])
+                       && !str_startswith("c++", argv[i+1])
+                       && !str_startswith("objective-c", argv[i+1])
+                       && !str_startswith("objective-c++", argv[i+1])
+                       ) {
+                rs_log_info("gcc's -x handling is complex; running locally for %s", argv[i+1] ? argv[i+1] : "empty");
                 return EXIT_DISTCC_FAILED;
             } else if (str_startswith("-dr", a)) {
                 rs_log_info("gcc's debug option %s may write extra files; "
@@ -516,8 +522,6 @@ int dcc_expand_preprocessor_options(char ***argv_ptr) {
             }
             free(argv);
             *argv_ptr = argv = new_argv;
-            i += extra_args - 1;
-            argc += extra_args - 1;
         }
     }
     return 0;
