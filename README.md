@@ -2,7 +2,7 @@
 
 by Martin Pool
 
-## Building on OSX
+## Building on macOS
 
 ```bash
 
@@ -13,6 +13,7 @@ by Martin Pool
 
 ## Current Documents
 https://cdn.rawgit.com/distcc/distcc/9a09372bd3f420cdd7021e52eda14fa536a3c10e/doc/web/index.html
+
 Formally http://distcc.org/
 
 "pump" functionality added by
