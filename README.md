@@ -2,6 +2,8 @@
 
 by Martin Pool
 
+This fork works with Xcode
+
 ## Building on macOS
 
 ```bash
