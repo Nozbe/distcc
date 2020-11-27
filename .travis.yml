@@ -1,7 +1,37 @@
-before_install: 
- - sudo apt-get update -qq
- - sudo apt-get install -qq make binutils-dev
+notifications:
+  email:
+    recipients:
+      - shawn@git.icu
+    on_success: change # default: change
+    on_failure: always # default: always
 
-language: cpp
+language: c
 
-before_script: ./autogen.sh
+cache: ccache
+
+addons:
+  apt:
+    packages:
+      - python3-dev
+      - libiberty-dev
+      - clang
+      - libavahi-client-dev 
+
+script:
+  - ./autogen.sh
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./configure; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then ./configure --without-libiberty; fi
+  - make
+  - make check
+
+matrix:
+  include:
+  - os: linux
+    compiler: gcc
+    dist: trusty
+  - os: linux
+    compiler: clang
+    dist: trusty
+  - os: osx
+    osx_image: xcode11.3
+    compiler: clang

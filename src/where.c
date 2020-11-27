@@ -83,6 +83,22 @@ static int dcc_lock_one(struct dcc_hostdef *hostlist,
                         int *cpu_lock_fd);
 
 
+void dcc_read_localslots_configuration()
+{
+    struct dcc_hostdef *hostlist;
+    int ret;
+    int n_hosts;
+
+    if ((ret = dcc_get_hostlist(&hostlist, &n_hosts)) == 0) {
+        while (hostlist) {
+            struct dcc_hostdef *l = hostlist;
+            hostlist = hostlist->next;
+            dcc_free_hostdef(l);
+        }
+    }
+}
+
+
 int dcc_pick_host_from_list_and_lock_it(struct dcc_hostdef **buildhost,
                             int *cpu_lock_fd)
 {
@@ -157,10 +173,14 @@ static int dcc_lock_one(struct dcc_hostdef *hostlist,
     int ret;
 
     while (1) {
-        for (i_cpu = 0; i_cpu < 50; i_cpu++) {
+        for (i_cpu = 0; i_cpu < 10000; i_cpu++) {
+            char i_cpu_is_usable = 0;
+
             for (h = hostlist; h; h = h->next) {
                 if (i_cpu >= h->n_slots)
                     continue;
+
+                i_cpu_is_usable = 1;
 
                 ret = dcc_lock_host("cpu", h, i_cpu, 0, cpu_lock_fd);
 
@@ -175,6 +195,9 @@ static int dcc_lock_one(struct dcc_hostdef *hostlist,
                     return ret;
                 }
             }
+
+            if (!i_cpu_is_usable)
+                break;
         }
 
         dcc_lock_pause();

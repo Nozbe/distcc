@@ -25,6 +25,7 @@
 #include <sys/select.h>
 #include <signal.h>
 #include <sys/file.h>
+#include <fcntl.h>
 #include <sys/time.h>
 #include <time.h>
 #include <sys/stat.h>
@@ -33,6 +34,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <fcntl.h>
 
 #include <avahi-common/domain.h>
 #include <avahi-common/error.h>
@@ -50,7 +52,7 @@
 /* How long shall the background daemon be idle before i terminates itself? */
 #define MAX_IDLE_TIME 20
 
-/* Maxium size of host file to load */
+/* Maximum size of host file to load */
 #define MAX_FILE_SIZE (1024*100)
 
 /* General daemon data */
@@ -82,7 +84,7 @@ struct host {
     AvahiServiceResolver *resolver;
 };
 
-/* A generic, system independant lock routine, similar to sys_lock,
+/* A generic, system independent lock routine, similar to sys_lock,
  * but more powerful:
  *        rw:         if non-zero: r/w lock instead of r/o lock
  *        enable:     lock or unlock
@@ -277,7 +279,7 @@ static void resolve_reply(
                 avahi_free(value);
             }
 
-            /* Look for the number of jobs in TXT RRs, and if not found, then set n_jobs = 4 * n_cpus */
+            /* Look for the number of jobs in TXT RRs, and if not found, then set n_jobs = n_cpus + 2 */
             for (i = txt; i; i = i->next) {
                 char *key, *value;
 
@@ -286,7 +288,7 @@ static void resolve_reply(
 
                 if (!strcmp(key, "jobs"))
                     if ((h->n_jobs = atoi(value)) <= 0)
-                        h->n_jobs = 4 * h->n_cpus;
+                        h->n_jobs = h->n_cpus + 2;
 
                 avahi_free(key);
                 avahi_free(value);
@@ -501,7 +503,7 @@ static int daemon_proc(const char *host_file, const char *lock_file, int n_slots
 
         /* Iterate the main loop for 5s */
         if (avahi_simple_poll_iterate(d.simple_poll, 5000) != 0) {
-            rs_log_crit("Event loop exited abnormaly.\n");
+            rs_log_crit("Event loop exited abnormally.\n");
             goto finish;
         }
     }
@@ -602,13 +604,17 @@ int dcc_zeroconf_add_hosts(struct dcc_hostdef **ret_list, int *ret_nhosts, int n
             rs_log_crit("fork() failed: %s\n", strerror(errno));
             goto finish;
         } else if (pid == 0) {
-            int fd;
+            int max_fd, fd;
             /* Child */
 
             /* Close file descriptors and replace them by /dev/null */
-            close(0);
-            close(1);
-            close(2);
+            max_fd = (int)sysconf(_SC_OPEN_MAX);
+            if(max_fd == -1) {
+                max_fd = 1024;
+            }
+            for(fd = 0; fd < max_fd; fd++) {
+                close(fd);
+            }
             fd = open("/dev/null", O_RDWR);
             assert(fd == 0);
             fd = dup(0);

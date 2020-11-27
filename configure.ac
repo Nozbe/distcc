@@ -9,11 +9,11 @@ dnl Process this file with autoconf to produce a configure script
 # Copyright (C) 2002, 2003, 2004 by Martin Pool
 
 # As of 0.6cvs, distcc no longer uses automake, only autoconf.
-AC_PREREQ(2.53)
-AC_INIT(distcc, 3.2rc1, distcc@lists.samba.org)
+AC_PREREQ(2.69)
+AC_INIT(distcc, 3.3.3, distcc@lists.samba.org)
 
 AC_CONFIG_HEADERS(src/config.h)
-AC_CANONICAL_HOST
+AC_CONFIG_MACRO_DIRS([m4])
 
 # FreeBSD installs its version of libpopt into /usr/local/, but does
 # not put that on the default library and header path.
@@ -23,35 +23,16 @@ AC_CANONICAL_HOST
 # either set CPPFLAGS and LDFLAGS when running configure, or use
 # --with-extra-foo.
 
-##### defaults
-
-dnl --with-docdir
-AC_DEFUN([DISTCC_WITH_DOCDIR],
-[AC_ARG_WITH(docdir,
-            AC_HELP_STRING([--with-docdir=DIR],
-                           [Use DIR to store documentation files (default ${datadir}/doc/distcc)]),
-            [with_docdir=$withval])
-if test "x$with_docdir" = "x" ; then
-  docdir='${datadir}/doc/distcc'
-else
-  docdir=$with_docdir
-fi
-AC_SUBST(docdir)
-])
-
-dnl Run the check for --with-docdir
-DISTCC_WITH_DOCDIR
-
-# Check for socklen_t, and do something appropiate on systems
+# Check for socklen_t, and do something appropriate on systems
 # that don't have it.
 AC_CHECK_TYPE([socklen_t], ,[
 	AC_MSG_CHECKING([for socklen_t equivalent])
 	AC_CACHE_VAL([dcc_cv_socklen_t_equiv],
 	[
-	# Systems have either "struct sockaddr *" or
+	# Systems have either "struct sockaddr{,_in} *" or
 	# "void *" as the second argument to getpeername
 	dcc_cv_socklen_t_equiv=
-	for arg2 in "struct sockaddr" void; do
+	for arg2 in "struct sockaddr_in" "struct sockaddr" void; do
 		for t in int size_t unsigned long "unsigned long"; do
 			AC_TRY_COMPILE([
 #include <sys/types.h>
@@ -78,12 +59,38 @@ getpeername(0,0,&len);
 	[#include <sys/types.h>
 #include <sys/socket.h>])
 
+dnl Android requires -llog for printf and friends
+dnl and will only run position independent executables
+AC_MSG_CHECKING([if building on Android])
+AC_TRY_COMPILE([], [
+  #ifdef __BIONIC__
+  int ok;
+  (void)ok;
+  #else
+  choke me
+  #endif],
+[AC_MSG_RESULT(yes)
+ LDFLAGS="$LDFLAGS -llog -pie"],
+[AC_MSG_RESULT(no)])
+
 # TODO: Handle program transform rules by autoconf.
 
 ### Checks for configure options
 
 AC_ARG_WITH(included-popt,
 	AC_HELP_STRING([--with-included-popt], [use bundled popt library, not from system]))
+
+AC_ARG_ENABLE(pump-mode,
+	AC_HELP_STRING([--disable-pump-mode],
+		[include server support (pump mode), requires python]),
+		[pump_mode=${enableval}], [pump_mode=yes])
+
+# We prefer to use the latest Python
+if test "x${pump_mode}" = xyes; then
+	AM_PATH_PYTHON([3.1],,[:])
+	AC_ARG_VAR(PYTHON, [Python interpreter])
+	AC_SUBST(PYTHON_RELATIVE_LIB)
+fi
 
 AC_ARG_ENABLE(rfc2553,
 	AC_HELP_STRING([--enable-rfc2553], [use getaddrinfo, getnameinfo, etc]))
@@ -210,7 +217,8 @@ then
 -Wno-write-strings"
 
     # For popt/*.c, we disable unused variable warnings.
-    POPT_CFLAGS="-Wno-unused"
+    # When using Apple GCC/Clang you have to explicitly disable unused parameters.
+    POPT_CFLAGS="-Wno-unused -Wno-unused-parameter"
 
     AC_MSG_NOTICE([Adding gcc options: $CFLAGS])
 fi
@@ -239,13 +247,6 @@ CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
 
-# We prefer to use the latest Python
-#
-# NB: Cannot use AC_CONFIG_LIBOBJ_DIR here, because it's not present
-# in autoconf 2.53.
-AM_PATH_PYTHON([3.1],,[:])
-AC_ARG_VAR(PYTHON, [Python interpreter])
-AC_SUBST(PYTHON_RELATIVE_LIB)
 AC_C_INLINE
 AC_C_BIGENDIAN
 
@@ -254,7 +255,7 @@ AC_C_BIGENDIAN
 
 # Some of these are needed by popt (or other libraries included in the future).
 
-AC_CHECK_HEADERS([unistd.h sys/types.h sys/sendfile.h sys/signal.h])
+AC_CHECK_HEADERS([unistd.h sys/types.h sys/sendfile.h])
 AC_CHECK_HEADERS([ctype.h sys/resource.h sys/socket.h sys/select.h])
 AC_CHECK_HEADERS([netinet/in.h], [], [],
 [#if HAVE_SYS_TYPES_H
@@ -382,10 +383,13 @@ AC_CHECK_FUNCS([strndup strsep mmap strlcpy])
 AC_CHECK_FUNCS([getloadavg])
 AC_CHECK_FUNCS([getline])
 
+AC_CHECK_FUNCS([fstatat])
+
 AC_CHECK_DECLS([snprintf, vsnprintf, vasprintf, asprintf, strndup])
 
 AC_MSG_CHECKING([if mmap() supports MAP_FAILED])
 AC_TRY_COMPILE([
+#include <stddef.h>
 #ifdef HAVE_SYS_MMAN_H
 #  include <sys/mman.h>
 #endif],[
@@ -394,12 +398,11 @@ if (mmap (NULL, 0, 0, 0, 0, 0) == MAP_FAILED)
 	return 0;
 #else
 #error mmap unavailable
-#endif], ,[
+#endif], AC_MSG_RESULT(yes), [
+	AC_MSG_RESULT(no)
 	AC_DEFINE([MAP_FAILED], [(void *)-1L],
 	[Define if MAP_FAILED constant not available])
 ])
-AC_MSG_RESULT()
-
 
 dnl
 dnl Test if the preprocessor understand vararg macros
@@ -428,9 +431,12 @@ fi
 
 AC_CACHE_CHECK([for C99 vsnprintf],rsync_cv_HAVE_C99_VSNPRINTF,[
 AC_TRY_RUN([
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <stdarg.h>
-void foo(const char *format, ...) {
+static int foo(const char *format, ...) {
        va_list ap;
        int len;
        char buf[5];
@@ -438,13 +444,13 @@ void foo(const char *format, ...) {
        va_start(ap, format);
        len = vsnprintf(0, 0, format, ap);
        va_end(ap);
-       if (len != 5) exit(1);
+       if (len != 5) return 1;
 
-       if (snprintf(buf, 3, "hello") != 5 || strcmp(buf, "he") != 0) exit(1);
+       if (snprintf(buf, 3, "hello") != 5 || strcmp(buf, "he") != 0) return 1;
 
-       exit(0);
+       return 0;
 }
-main() { foo("hello"); }
+int main() { return foo("hello"); }
 ],
 rsync_cv_HAVE_C99_VSNPRINTF=yes,rsync_cv_HAVE_C99_VSNPRINTF=no,rsync_cv_HAVE_C99_VSNPRINTF=cross)])
 if test x"$rsync_cv_HAVE_C99_VSNPRINTF" = x"yes"; then
@@ -457,9 +463,9 @@ AC_TRY_RUN([
 #include <sys/types.h>
 #include <sys/socket.h>
 
-main() {
+int main() {
        int fd[2];
-       exit((socketpair(AF_UNIX, SOCK_STREAM, 0, fd) != -1) ? 0 : 1);
+       return (socketpair(AF_UNIX, SOCK_STREAM, 0, fd) != -1) ? 0 : 1;
 }],
 rsync_cv_HAVE_SOCKETPAIR=yes,rsync_cv_HAVE_SOCKETPAIR=no,rsync_cv_HAVE_SOCKETPAIR=cross)])
 if test x"$rsync_cv_HAVE_SOCKETPAIR" = x"yes"; then
@@ -502,7 +508,7 @@ AC_ARG_WITH([auth],
 
 if test x"$with_auth" = xyes; then
         AC_SEARCH_LIBS([gss_init_sec_context],
-                        [gssapi gssapi_krb5],
+                        [gssapi gssapi_krb5 gss],
 	                AC_DEFINE(HAVE_GSSAPI, 1, [Define if the GSS_API is available])
 	                AUTH_COMMON_OBJS="src/auth_common.o"
 	                AUTH_DISTCC_OBJS="src/auth_distcc.o"
@@ -517,13 +523,12 @@ AC_SUBST(AUTH_COMMON_OBJS)
 AC_SUBST(AUTH_DISTCC_OBJS)
 AC_SUBST(AUTH_DISTCCD_OBJS)
 
-ACX_PTHREAD
+AX_PTHREAD
 LIBS="$PTHREAD_LIBS $LIBS"
 CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
 CC="$PTHREAD_CC"
 
 dnl ##### Output
-AC_SUBST(docdir)
 AC_SUBST(CFLAGS)
 AC_SUBST(LDFLAGS)
 AC_SUBST(CPPFLAGS)

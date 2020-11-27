@@ -24,6 +24,7 @@
 #include <setjmp.h>
 #include <stdio.h>
 #include <time.h>
+#include <stdint.h>
 
 /* util.c */
 int dcc_timecmp(struct timeval a, struct timeval b);
@@ -49,6 +50,7 @@ int dcc_get_dns_domain(const char **domain_name);
 void dcc_get_proc_stats(int *num_D, int *max_RSS, char **max_RSS_name);
 void dcc_get_disk_io_stats(int *n_reads, int *n_writes);
 
+int dcc_which(const char *cmd, char **out);
 
 int dcc_dup_part(const char **psrc, char **pdst, const char *sep);
 
@@ -61,3 +63,5 @@ int dcc_tokenize_string(const char *in, char ***argv_ptr);
 #ifndef HAVE_GETLINE
 ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 #endif
+
+int sd_is_socket(int fd, int family, int type, int listening);

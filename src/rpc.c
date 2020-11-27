@@ -37,6 +37,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <ctype.h>
+#include <stdint.h>
 
 #include <sys/stat.h>
 
@@ -142,7 +143,7 @@ int dcc_explain_mismatch(const char *buf,
 
     extrabuf[l] = '\0';
     for (p = extrabuf; *p; p++)
-        if (!(isprint(*p) || *p == ' ' || *p == '\t')) {
+        if (!(isprint((uint8_t)*p) || *p == ' ' || *p == '\t')) {
             *p = '\0';
             break;
         }
@@ -218,7 +219,7 @@ int dcc_r_sometoken_int(int ifd, char *token, unsigned *val)
         return ret;
     }
 
-    strncpy(token, buf, 4);
+    memcpy(token, buf, 4);
     token[4] = '\0';
 
     buf[12] = '\0';             /* terminate */

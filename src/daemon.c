@@ -44,6 +44,7 @@
 
 #include <config.h>
 
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -107,6 +108,7 @@ static int dcc_setup_startup_log(void)
         rs_add_logger(rs_logger_file, RS_LOG_DEBUG, 0, STDERR_FILENO);
     } else {
         openlog("distccd", LOG_PID, LOG_DAEMON);
+        rs_trace_syslog = TRUE;
         rs_add_logger(rs_logger_syslog, RS_LOG_DEBUG, NULL, 0);
     }
 
@@ -151,6 +153,24 @@ static int dcc_setup_daemon_path(void)
     }
 }
 
+static void dcc_warn_masquerade_whitelist(void) {
+    DIR *d, *e;
+    const char *warn = "You must see up masquerade" \
+                       " (see distcc(1)) to list whitelisted compilers or pass" \
+                       " --enable-tcp-insecure. To set up masquerade automatically" \
+                       " run update-distcc-symlinks.";
+
+    e = opendir("/usr/lib/distcc");
+    d = opendir(LIBDIR "/distcc");
+    if (!e && !d) {
+        rs_log_crit(LIBDIR "/distcc not found. %s", warn);
+        dcc_exit(EXIT_COMPILER_MISSING);
+    }
+    if ((!e || !readdir(e)) && (!d || !readdir(d))) {
+        rs_log_crit(LIBDIR "/distcc empty. %s", warn);
+        dcc_exit(EXIT_COMPILER_MISSING);
+    }
+}
 
 /**
  * distcc daemon.  May run from inetd, or standalone.  Accepts
@@ -168,10 +188,10 @@ int main(int argc, char *argv[])
     /* check this before redirecting the logs, so that it's really obvious */
     if (!dcc_should_be_inetd())
         if (opt_allowed == NULL) {
-            rs_log_error("--allow option is now mandatory; "
-                         "you must specify which clients are allowed to connect");
-            ret = EXIT_BAD_ARGUMENTS;
-            goto out;
+            rs_log_warning("No --allow option specified. Defaulting to --allow-private."
+                         " Allowing non-Internet (globally"
+                         " routable) addresses.");
+            opt_allow_private = 1;
         }
 
     if ((ret = dcc_set_lifetime()) != 0)
@@ -226,6 +246,9 @@ int main(int argc, char *argv[])
 
     /* Initialize the distcc io timeout value */
     dcc_get_io_timeout();
+
+    if (!opt_enable_tcp_insecure)
+        dcc_warn_masquerade_whitelist();
 
     if (dcc_should_be_inetd())
         ret = dcc_inetd_server();
@@ -283,6 +306,7 @@ static void dcc_setup_real_log(void)
 
     rs_remove_all_loggers();
     openlog("distccd", LOG_PID, LOG_DAEMON);
+    rs_trace_syslog = TRUE;
     rs_add_logger(rs_logger_syslog, opt_log_level_num, NULL, 0);
 }
 

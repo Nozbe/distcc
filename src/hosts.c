@@ -207,7 +207,7 @@ int dcc_get_hostlist(struct dcc_hostdef **ret_list,
  * *psrc is the current parse cursor; it is advanced over what is read.
  *
  * If a multiplier is present, *psrc points to a substring starting with '/'.
- * The host defintion is updated to the numeric value following.  Otherwise
+ * The host definition is updated to the numeric value following.  Otherwise
  * the hostdef is unchanged.
  **/
 static int dcc_parse_multiplier(const char **psrc, struct dcc_hostdef *hostdef)
@@ -222,7 +222,7 @@ static int dcc_parse_multiplier(const char **psrc, struct dcc_hostdef *hostdef)
             rs_log_error("bad multiplier \"%s\" in host specification", token);
             return EXIT_BAD_HOSTSPEC;
         }
-        while (isdigit(**psrc))
+        while (isdigit((uint8_t)**psrc))
             (*psrc)++;
         hostdef->n_slots = val;
     }
@@ -245,6 +245,7 @@ static int dcc_parse_options(const char **psrc,
     host->cpp_where = DCC_CPP_ON_CLIENT;
 #ifdef HAVE_GSSAPI
     host->authenticate = 0;
+    host->auth_name = NULL;
 #endif
 
     while (p[0] == ',') {
@@ -266,6 +267,17 @@ static int dcc_parse_options(const char **psrc,
             rs_trace("got GSSAPI option");
             host->authenticate = 1;
             p += 4;
+            if (p[0] == '=') {
+                p++;
+                int ret;
+                if ((ret = dcc_dup_part(&p, &host->auth_name, "/: \t\n\r\f,")))
+	                return ret;
+
+                if (host->auth_name) {
+                    rs_trace("using \"%s\" server name instead of fqdn "
+                             "lookup for GSS-API auth", host->auth_name);
+                }
+            }
 #endif
         } else {
             rs_log_error("unrecognized option in host specification: %s",
@@ -368,7 +380,7 @@ static int dcc_parse_tcp_host(struct dcc_hostdef *hostdef,
         token++;
 
         hostdef->port = strtol(token, &tail, 10);
-        if (*tail != '\0' && !isspace(*tail) && *tail != '/' && *tail != ',') {
+        if (*tail != '\0' && !isspace((uint8_t)*tail) && *tail != '/' && *tail != ',') {
             rs_log_error("invalid tcp port specification in \"%s\"", token);
             return EXIT_BAD_HOSTSPEC;
         } else {
@@ -509,7 +521,7 @@ int dcc_parse_hosts(const char *where, const char *source_name,
             continue;
         }
 
-        if (isspace(where[0])) {
+        if (isspace((uint8_t)where[0])) {
             where++;            /* skip space */
             continue;
         }

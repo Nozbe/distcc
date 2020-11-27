@@ -8,6 +8,7 @@
 /* (C) 1998-2002 Red Hat, Inc. -- Licensing details are in the COPYING
    file accompanying popt source distributions, available from 
    ftp://ftp.rpm.org/pub/rpm/dist. */
+#include <stdint.h>
 
 #include "system.h"
 #include "poptint.h"
@@ -332,12 +333,12 @@ static void singleOptionHelp(FILE * fp, int maxLeftCol,
 /*@-boundsread@*/
     while (helpLength > lineLength) {
 	const char * ch;
-	char format[16];
+	char format[30];
 
 	ch = help + lineLength - 1;
-	while (ch > help && !isspace(*ch)) ch--;
+	while (ch > help && !isspace((uint8_t)*ch)) ch--;
 	if (ch == help) break;		/* give up */
-	while (ch > (help + 1) && isspace(*ch)) ch--;
+	while (ch > (help + 1) && isspace((uint8_t)*ch)) ch--;
 	ch++;
 
 	sprintf(format, "%%.%ds\n%%%ds", (int) (ch - help), indentLength);
@@ -345,7 +346,7 @@ static void singleOptionHelp(FILE * fp, int maxLeftCol,
 	fprintf(fp, format, help, " ");
 	/*@=formatconst@*/
 	help = ch;
-	while (isspace(*help) && *help) help++;
+	while (isspace((uint8_t)*help) && *help) help++;
 	helpLength = strlen(help);
     }
 /*@=boundsread@*/

@@ -52,7 +52,9 @@
  */
 
 static const uint32_t allones = 0xffffffffUL;
+#ifdef ENABLE_RFC2553
 static const uint8_t allones8 = 0xffU;
+#endif
 
 /**
  * Split a "HOST/BITS" mask specification into HOST and BITS.
@@ -181,7 +183,7 @@ int dcc_parse_mask(const char *spec,
 #else /* ENABLE_RFC2553 */
 
     memset(&hints, 0, sizeof(hints));
-    hints.ai_flags = AI_NUMERICHOST;
+    hints.ai_flags = 0;
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
 

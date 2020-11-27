@@ -6,6 +6,8 @@
    file accompanying popt source distributions, available from 
    ftp://ftp.rpm.org/pub/rpm/dist. */
 
+#include <stdint.h>
+
 #include "system.h"
 #include "poptint.h"
 
@@ -29,20 +31,20 @@ static void configLine(poptContext con, char * line)
     /*@=type@*/
 
     line += nameLength;
-    if (*line == '\0' || !isspace(*line)) return;
+    if (*line == '\0' || !isspace((uint8_t)*line)) return;
 
-    while (*line != '\0' && isspace(*line)) line++;
+    while (*line != '\0' && isspace((uint8_t)*line)) line++;
     entryType = line;
-    while (*line == '\0' || !isspace(*line)) line++;
+    while (*line == '\0' || !isspace((uint8_t)*line)) line++;
     *line++ = '\0';
 
-    while (*line != '\0' && isspace(*line)) line++;
+    while (*line != '\0' && isspace((uint8_t)*line)) line++;
     if (*line == '\0') return;
     opt = line;
-    while (*line == '\0' || !isspace(*line)) line++;
+    while (*line == '\0' || !isspace((uint8_t)*line)) line++;
     *line++ = '\0';
 
-    while (*line != '\0' && isspace(*line)) line++;
+    while (*line != '\0' && isspace((uint8_t)*line)) line++;
     if (*line == '\0') return;
 
     /*@-temptrans@*/ /* FIX: line alias is saved */
@@ -137,7 +139,7 @@ int poptReadConfigFile(poptContext con, const char * fn)
 	  case '\n':
 	    *dst = '\0';
 	    dst = buf;
-	    while (*dst && isspace(*dst)) dst++;
+	    while (*dst && isspace((uint8_t)*dst)) dst++;
 	    if (*dst && *dst != '#')
 		configLine(con, dst);
 	    chptr++;

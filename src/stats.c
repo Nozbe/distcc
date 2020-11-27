@@ -133,8 +133,8 @@ void dcc_stats_compile_ok(char *compiler, char *filename, struct timeval start,
         memcpy(&(sd.start), &start, sizeof(struct timeval));
         memcpy(&(sd.stop), &stop, sizeof(struct timeval));
         sd.time = time_usec;
-        strncpy(sd.filename, filename, MAX_FILENAME_LEN);
-        strncpy(sd.compiler, compiler, MAX_FILENAME_LEN);
+        strncpy(sd.filename, filename, MAX_FILENAME_LEN - 1);
+        strncpy(sd.compiler, compiler, MAX_FILENAME_LEN - 1);
         dcc_writex(dcc_statspipe[1], &sd, sizeof(sd));
     }
 }
@@ -178,7 +178,7 @@ static void dcc_stats_update_compile_times(struct statsdata *sd) {
             free(curr_sd);
             curr_sd = prev_sd->next;
         } else {
-            /* we didn't delete anyting. move forward by one */
+            /* we didn't delete anything. move forward by one */
             prev_sd = curr_sd;
             curr_sd = curr_sd->next;
         }
@@ -469,6 +469,7 @@ static void dcc_stats_process(struct statsdata *sd) {
         break;
     case STATS_COMPILE_OK:
         dcc_stats_update_compile_times(sd);
+        /* fallthrough */
     case STATS_COMPILE_ERROR:
     case STATS_COMPILE_TIMEOUT:
     case STATS_CLI_DISCONN:
